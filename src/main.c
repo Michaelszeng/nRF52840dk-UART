@@ -13,9 +13,10 @@
 
 const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart1));
 
-#define RECEIVE_BUFF_SIZE 4
-// #define MAGIC_NUMBER '77'
-static uint8_t* rx_buf; //A buffer to store incoming UART data
+#define BUFF_SIZE 10  // IMPORTANT: RX and TX buffers must be the same size. This is bc UART_RX_RDY event only occurs when RX buffer is full.
+static uint8_t* rx_buf;  // A buffer to store incoming UART data
+
+#define MAGIC_NUMBER 0xFF  // Used to confirm that incoming data is valid
 
 
 static void uart_cb(const struct device *dev, struct uart_event *evt, void *user_data)
@@ -32,29 +33,31 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		break;
 		
 	case UART_RX_RDY:
-		// printk("	evt->data.rx.len: %d\n", evt->data.rx.len);
+		printk("evt->data.rx.len: %d\n", evt->data.rx.len);
 		// printk("	evt->data.rx.offset: %d\n", evt->data.rx.offset);
-		// if (evt->data.rx.buf[evt->data.rx.offset] != '77') {
-		// 	printk("Received data that did not start with the magic number. Ignoring it.\n");
-		// 	// break;
-		// }
+
+		// Sometimes, on boot, trash data is received, so this prevents us from trying to parse the trash data
+		if (evt->data.rx.buf[evt->data.rx.offset] != MAGIC_NUMBER) {
+			printk("Received data that did not start with the magic number. Ignoring it.\n");
+			break;
+		}
+		if (evt->data.rx.len != BUFF_SIZE) {
+			printk("Received data not correct length. Ignoring it.\n");
+			break;
+		}
 		
 		printk("data received: ");
 		for (int i=0; i < evt->data.rx.len; i++) {
 			printk("%02X ", evt->data.rx.buf[evt->data.rx.offset + i]);
-
-			if (evt->data.rx.buf[evt->data.rx.offset + i] == '\n') {
-				break;
-			}
 		}
 		printk("\n");
 		break;
 
 	case UART_RX_BUF_REQUEST:
 		// printk("UART_RX_BUF_REQUEST\n");
-		rx_buf = k_malloc(RECEIVE_BUFF_SIZE * sizeof(uint8_t));
+		rx_buf = k_malloc(BUFF_SIZE * sizeof(uint8_t));
 		if (rx_buf) {
-			uart_rx_buf_rsp(uart, rx_buf, sizeof(rx_buf));
+			uart_rx_buf_rsp(uart, rx_buf, BUFF_SIZE);
 		} else {
 			printk("WARNING: Not able to allocate UART receive buffer");
 		}
@@ -67,7 +70,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		
 	case UART_RX_DISABLED:
 		printk("UART_RX_DISABLED\n");
-		uart_rx_enable(uart, rx_buf, sizeof(rx_buf), SYS_FOREVER_US);
+		uart_rx_enable(uart, rx_buf, BUFF_SIZE, SYS_FOREVER_US);
 		break;
 
 	case UART_RX_STOPPED:
@@ -86,7 +89,6 @@ int main(void)
 	printk("Starting Program..\n");
 
 	int ret;
-	int err;
 
 	// UART
 	if (!device_is_ready(uart)) {
@@ -99,14 +101,14 @@ int main(void)
 		return ret;
 	}
 
-	k_msleep(500);
-	ret = uart_rx_enable(uart, rx_buf, sizeof(rx_buf), SYS_FOREVER_US);
+	k_msleep(1000);
+	ret = uart_rx_enable(uart, rx_buf, BUFF_SIZE, SYS_FOREVER_US);
 	if (ret) {
 		printk("uart_rx_enable faild with ret=%d\n", ret);
 		return ret;
 	}
 
-	static char tx_buf[] = {'5', '7', '5', '\n'};
+	static char tx_buf[BUFF_SIZE] = {MAGIC_NUMBER, 0xFF, 0xFF, 0xFF, 0xFF, '1', '2', '3', '4', '5'};
 
 	int ctr = 0;
 	while (1) {
@@ -114,9 +116,9 @@ int main(void)
 		printk("Looping... %d\n", ctr);
 		ctr++;
 
-		err = uart_tx(uart, tx_buf, sizeof(tx_buf), SYS_FOREVER_US);
-		if (err) {
-			printk("uart_tx errored: %d.\n", err);
+		ret = uart_tx(uart, tx_buf, BUFF_SIZE, SYS_FOREVER_US);
+		if (ret) {
+			printk("uart_tx errored: %d.\n", ret);
 		}
 
 		k_msleep(SLEEP_TIME_MS);
