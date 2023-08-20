@@ -1,33 +1,6 @@
-.. _hello_world:
-
-Hello World
+nRF7002dk-UART
 ###########
 
-Overview
-********
+Basic firmware that demonstrates UART TX and RX using nRF7002DK (TX Pin: P1.01; RX Pin: P1.00).
 
-A simple sample that can be used with any :ref:`supported board <boards>` and
-prints "Hello World" to the console.
-
-Building and Running
-********************
-
-This application can be built and executed on QEMU as follows:
-
-.. zephyr-app-commands::
-   :zephyr-app: samples/hello_world
-   :host-os: unix
-   :board: qemu_x86
-   :goals: run
-   :compact:
-
-To build for another board, change "qemu_x86" above to that board's name.
-
-Sample Output
-=============
-
-.. code-block:: console
-
-    Hello World! x86
-
-Exit QEMU by pressing :kbd:`CTRL+A` :kbd:`x`.
+You can test this program by wiring two nRF7002DK's together like so: https://files.slack.com/files-pri/TBBCU4BKL-F05NMH4L59R/img_4939.jpg
