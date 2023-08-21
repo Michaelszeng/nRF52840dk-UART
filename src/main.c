@@ -11,7 +11,10 @@
 #define SLEEP_TIME_MS   1000
 
 
-const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart1));
+#define UART uart1  // uart1: TX = P1.01, RX = P1.00.    TO BE USED FOR UART DEBUGGING
+// #define UART uart2  // uart2: TX = P1.13, RX = P1.12.    TO BE USED FOR UART COMMS WITH nRF9160
+
+const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(UART));
 
 #define BUFF_SIZE 10  // IMPORTANT: RX and TX buffers must be the same size. This is bc UART_RX_RDY event only occurs when RX buffer is full.
 static uint8_t* rx_buf;  // A buffer to store incoming UART data
@@ -90,7 +93,6 @@ int main(void)
 
 	int ret;
 
-	// UART
 	if (!device_is_ready(uart)) {
 		printk("uart not ready. returning.\n");
 		return -1;
