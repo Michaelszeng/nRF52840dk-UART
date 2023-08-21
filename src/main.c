@@ -1,7 +1,3 @@
-/*
- * THIS IS NOW BEING USED TO TEST UART RECEIVING
- */
-
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/i2c.h>
@@ -11,8 +7,8 @@
 #define SLEEP_TIME_MS   1000
 
 
-#define UART uart1  // uart1: TX = P1.01, RX = P1.00.    TO BE USED FOR UART DEBUGGING
-// #define UART uart2  // uart2: TX = P1.13, RX = P1.12.    TO BE USED FOR UART COMMS WITH nRF9160
+#define UART uart1  // uart1: TX = P1.01, RX = P1.00.    TO BE USED FOR UART COMMS WITH nRF9160
+// #define UART uart2  // uart2: TX = P1.13, RX = P1.12.    TO BE USED FOR UART DEBUGGING
 
 const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(UART));
 
