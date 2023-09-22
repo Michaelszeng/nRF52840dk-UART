@@ -131,5 +131,6 @@ int main(void)
 		k_msleep(SLEEP_TIME_MS);
 
 	}
+	
 	return 0;
 }
