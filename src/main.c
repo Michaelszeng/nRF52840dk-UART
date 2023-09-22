@@ -115,7 +115,10 @@ int main(void)
 		return ret;
 	}
 
-	static char tx_buf[BUFF_SIZE] = {MAGIC_NUMBER, 0xFF, 0xFF, 0xFF, 0xFF, '1', '2', '3', '4', '5'};
+	static char tx_buf[100];
+	for (int i=0; i<100; i++) {
+		tx_buf[i] = 77;
+	}
 
 	int ctr = 0;
 	while (1) {
@@ -131,6 +134,6 @@ int main(void)
 		k_msleep(SLEEP_TIME_MS);
 
 	}
-	
+
 	return 0;
 }
