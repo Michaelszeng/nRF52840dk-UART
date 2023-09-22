@@ -12,14 +12,16 @@
 
 const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(UART));
 
-#define BUFF_SIZE 10  // IMPORTANT: RX and TX buffers must be the same size. This is bc UART_RX_RDY event only occurs when RX buffer is full.
+#define BUFF_SIZE 99  // IMPORTANT: RX and TX buffers must be the same size. This is bc UART_RX_RDY event only occurs when RX buffer is full.
 static uint8_t* rx_buf;  // A buffer to store incoming UART data
 
-#define MAGIC_NUMBER 0xFF  // Used to confirm that incoming data is valid
+#define MAGIC_NUMBER 'M'  // Used to confirm that incoming data is valid
 
 
 static void uart_cb(const struct device *dev, struct uart_event *evt, void *user_data)
 {
+
+	int err;
 
 	switch (evt->type) {
 	
@@ -35,13 +37,14 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		printk("evt->data.rx.len: %d\n", evt->data.rx.len);
 		// printk("	evt->data.rx.offset: %d\n", evt->data.rx.offset);
 
+		if (evt->data.rx.len != BUFF_SIZE) {
+			printk("Received data not correct length. Ignoring it.\n");
+			break;
+		}
+
 		// Sometimes, on boot, trash data is received, so this prevents us from trying to parse the trash data
 		if (evt->data.rx.buf[evt->data.rx.offset] != MAGIC_NUMBER) {
 			printk("Received data that did not start with the magic number. Ignoring it.\n");
-			break;
-		}
-		if (evt->data.rx.len != BUFF_SIZE) {
-			printk("Received data not correct length. Ignoring it.\n");
 			break;
 		}
 		
@@ -53,10 +56,13 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		break;
 
 	case UART_RX_BUF_REQUEST:
-		// printk("UART_RX_BUF_REQUEST\n");
+		printk("UART_RX_BUF_REQUEST\n");
 		rx_buf = k_malloc(BUFF_SIZE * sizeof(uint8_t));
 		if (rx_buf) {
-			uart_rx_buf_rsp(uart, rx_buf, BUFF_SIZE);
+			err = uart_rx_buf_rsp(uart, rx_buf, BUFF_SIZE);
+			if (err) { 
+				printk("uart_rx_buf_rsp with err=%d\n", err);
+			}
 		} else {
 			printk("WARNING: Not able to allocate UART receive buffer");
 		}
@@ -69,7 +75,10 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		
 	case UART_RX_DISABLED:
 		printk("UART_RX_DISABLED\n");
-		uart_rx_enable(uart, rx_buf, BUFF_SIZE, SYS_FOREVER_US);
+		err = uart_rx_enable(uart, rx_buf, BUFF_SIZE, SYS_FOREVER_US);
+		if (err) { 
+				printk("uart_rx_enable with err=%d\n", err);
+			}
 		break;
 
 	case UART_RX_STOPPED:
