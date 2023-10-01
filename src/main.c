@@ -12,6 +12,7 @@
 
 const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(UART));
 
+// NOTE: if the transmitted data is more bytes than this buffer, this will cause a crash/reboot.
 #define BUFF_SIZE 25  // IMPORTANT: RX and TX buffers must be the same size. This is bc UART_RX_RDY event only occurs when RX buffer is full.
 static uint8_t* rx_buf;  // A buffer to store incoming UART data
 
@@ -34,7 +35,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		break;
 		
 	case UART_RX_RDY:
-		printk("evt->data.rx.len: %d\n", evt->data.rx.len);
+		// printk("evt->data.rx.len: %d\n", evt->data.rx.len);
 		// printk("	evt->data.rx.offset: %d\n", evt->data.rx.offset);
 
 		// if (evt->data.rx.len != BUFF_SIZE) {
@@ -57,7 +58,7 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		break;
 
 	case UART_RX_BUF_REQUEST:
-		printk("UART_RX_BUF_REQUEST\n");
+		// printk("UART_RX_BUF_REQUEST\n");
 		rx_buf = k_malloc(BUFF_SIZE * sizeof(uint8_t));
 		if (rx_buf) {
 			err = uart_rx_buf_rsp(uart, rx_buf, BUFF_SIZE);
