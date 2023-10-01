@@ -12,7 +12,7 @@
 
 const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(UART));
 
-#define BUFF_SIZE 99  // IMPORTANT: RX and TX buffers must be the same size. This is bc UART_RX_RDY event only occurs when RX buffer is full.
+#define BUFF_SIZE 25  // IMPORTANT: RX and TX buffers must be the same size. This is bc UART_RX_RDY event only occurs when RX buffer is full.
 static uint8_t* rx_buf;  // A buffer to store incoming UART data
 
 #define MAGIC_NUMBER 'M'  // Used to confirm that incoming data is valid
@@ -37,22 +37,23 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		printk("evt->data.rx.len: %d\n", evt->data.rx.len);
 		// printk("	evt->data.rx.offset: %d\n", evt->data.rx.offset);
 
-		if (evt->data.rx.len != BUFF_SIZE) {
-			printk("Received data not correct length. Ignoring it.\n");
-			break;
-		}
+		// if (evt->data.rx.len != BUFF_SIZE) {
+		// 	printk("Received data not correct length. Ignoring it.\n");
+		// 	break;
+		// }
 
-		// Sometimes, on boot, trash data is received, so this prevents us from trying to parse the trash data
-		if (evt->data.rx.buf[evt->data.rx.offset] != MAGIC_NUMBER) {
-			printk("Received data that did not start with the magic number. Ignoring it.\n");
-			break;
-		}
+		// // Sometimes, on boot, trash data is received, so this prevents us from trying to parse the trash data
+		// if (evt->data.rx.buf[evt->data.rx.offset] != MAGIC_NUMBER) {
+		// 	printk("Received data that did not start with the magic number. Ignoring it.\n");
+		// 	break;
+		// }
 		
-		printk("data received: ");
+		// printk("data received: ");
 		for (int i=0; i < evt->data.rx.len; i++) {
-			printk("%02X ", evt->data.rx.buf[evt->data.rx.offset + i]);
+			// printk("%02X ", evt->data.rx.buf[evt->data.rx.offset + i]);
+			printk("%c", evt->data.rx.buf[evt->data.rx.offset + i]);
 		}
-		printk("\n");
+		// printk("\n");
 		break;
 
 	case UART_RX_BUF_REQUEST:
@@ -111,22 +112,28 @@ int main(void)
 	k_msleep(1000);
 	ret = uart_rx_enable(uart, rx_buf, BUFF_SIZE, SYS_FOREVER_US);
 	if (ret) {
-		printk("uart_rx_enable faild with ret=%d\n", ret);
+		printk("uart_rx_enable failed with ret=%d\n", ret);
 		return ret;
 	}
-
-	static char tx_buf[100];
-	for (int i=0; i<100; i++) {
-		tx_buf[i] = 77;
-	}
+	
+	static char tx_buf[] = "hello world!\n";
 
 	int ctr = 0;
 	while (1) {
 
-		printk("Looping... %d\n", ctr);
+		printk("x ");
 		ctr++;
 
-		ret = uart_tx(uart, tx_buf, BUFF_SIZE, SYS_FOREVER_US);
+		// char c;
+		// int uart_poll_in_ret = 0;
+		// while (uart_poll_in_ret == 0) {
+		// 	uart_poll_in_ret = uart_poll_in(uart, &c);
+		// 	printk("%c", c);
+		// }
+		// printk("uart_poll_in err: %d\n", uart_poll_in_ret);
+
+
+		ret = uart_tx(uart, tx_buf, sizeof(tx_buf), SYS_FOREVER_US);
 		if (ret) {
 			printk("uart_tx errored: %d.\n", ret);
 		}
