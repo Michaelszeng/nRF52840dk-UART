@@ -4,25 +4,34 @@
 #include <zephyr/sys/printk.h>
 #include <zephyr/drivers/uart.h>
 
-#define SLEEP_TIME_MS   1000
+/**
+ * This program reads data over uart1, then prints the receved data along with debug info
+ * to uart0 with.
+ */
+
+#define DEBUG_PRINT_ENABLED 1
+
+const struct device *gps_uart = DEVICE_DT_GET(DT_NODELABEL(uart1));  // uart1: TX = P0.04, RX = P0.05.    TO BE USED FOR UART COMMS WITH GPS
+const struct device *dbg_uart = DEVICE_DT_GET(DT_NODELABEL(uart0));  // uart0: TX = P0.28, RX = P0.30.    TO BE USED FOR UART DEBUGGING
+
+// NOTE: if the transmitted data is more bytes than this buffer, this will cause a crash/reboot. (?)
+#define BUFF_SIZE 100  // Note: UART_RX_RDY event only occurs when RX buffer is full. (?)
+static uint8_t* rx_buf;
 
 
-#define UART uart1  // uart1: TX = P1.01, RX = P1.00.    TO BE USED FOR UART COMMS WITH nRF9160
-// #define UART uart2  // uart2: TX = P1.13, RX = P1.12.    TO BE USED FOR UART DEBUGGING
-
-const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(UART));
-
-// NOTE: if the transmitted data is more bytes than this buffer, this will cause a crash/reboot.
-#define BUFF_SIZE 25  // IMPORTANT: RX and TX buffers must be the same size. This is bc UART_RX_RDY event only occurs when RX buffer is full.
-static uint8_t* rx_buf;  // A buffer to store incoming UART data
-
-#define MAGIC_NUMBER 'M'  // Used to confirm that incoming data is valid
+static void dbg_print(char* buf, int len) {
+	/**
+	 * Helper function to print things over debug uart
+ 	 */
+	if (DEBUG_PRINT_ENABLED) {
+		uart_tx(dbg_uart, buf, len, SYS_FOREVER_US);
+	}
+}
 
 
-static void uart_cb(const struct device *dev, struct uart_event *evt, void *user_data)
-{
+static void gps_uart_cb(const struct device *dev, struct uart_event *evt, void *user_data) {
 
-	int err;
+	int ret;
 
 	switch (evt->type) {
 	
@@ -48,43 +57,42 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 		// 	printk("Received data that did not start with the magic number. Ignoring it.\n");
 		// 	break;
 		// }
+		uint8_t data_len = (uint8_t) evt->data.rx.len;
+		dbg_print("rx data len: ", sizeof("rx data len: "));
+		dbg_print(&(data_len), 1);
 		
-		// printk("data received: ");
+		dbg_print("received data: ", sizeof("received data: "));
 		for (int i=0; i < evt->data.rx.len; i++) {
-			// printk("%02X ", evt->data.rx.buf[evt->data.rx.offset + i]);
-			printk("%c", evt->data.rx.buf[evt->data.rx.offset + i]);
+			dbg_print("X", 1);
+			dbg_print(&(evt->data.rx.buf[evt->data.rx.offset + i]), 1);
 		}
-		// printk("\n");
+		dbg_print("\n", 1);
 		break;
 
 	case UART_RX_BUF_REQUEST:
-		// printk("UART_RX_BUF_REQUEST\n");
 		rx_buf = k_malloc(BUFF_SIZE * sizeof(uint8_t));
 		if (rx_buf) {
-			err = uart_rx_buf_rsp(uart, rx_buf, BUFF_SIZE);
-			if (err) { 
-				printk("uart_rx_buf_rsp with err=%d\n", err);
+			ret = uart_rx_buf_rsp(gps_uart, rx_buf, BUFF_SIZE);
+			if (ret) { 
+				dbg_print("uart_rx_buf_rsp failed.", sizeof("uart_rx_buf_rsp failed."));
 			}
 		} else {
-			printk("WARNING: Not able to allocate UART receive buffer");
+			dbg_print("Not able to allocate UART receive buffer.", sizeof("Not able to allocate UART receive buffer."));
 		}
 		break;
 
 	case UART_RX_BUF_RELEASED:
-		// printk("UART_RX_BUF_RELEASED\n");
 		k_free(rx_buf);
 		break;
 		
 	case UART_RX_DISABLED:
-		printk("UART_RX_DISABLED\n");
-		err = uart_rx_enable(uart, rx_buf, BUFF_SIZE, SYS_FOREVER_US);
-		if (err) { 
-				printk("uart_rx_enable with err=%d\n", err);
-			}
+		ret = uart_rx_enable(gps_uart, rx_buf, BUFF_SIZE, SYS_FOREVER_US);
+		if (ret) { 
+			dbg_print("uart_rx_enable failed.", sizeof("uart_rx_enable failed."));
+		}
 		break;
 
 	case UART_RX_STOPPED:
-		printk("UART_RX_STOPPED\n");
 		break;
 		
 	default:
@@ -93,54 +101,51 @@ static void uart_cb(const struct device *dev, struct uart_event *evt, void *user
 }
 
 
-int main(void)
-{
-	k_msleep(1000);
-	printk("Starting Program..\n");
+static void dbg_uart_cb(const struct device *dev, struct uart_event *evt, void *user_data) { }  // No need to do anything
 
+
+int main(void) {
+	
+	k_msleep(1000);
 	int ret;
 
-	if (!device_is_ready(uart)) {
-		printk("uart not ready. returning.\n");
+	/////////////////////////////////// DEBUG UART SETUP ///////////////////////////////////
+	if (!device_is_ready(dbg_uart)) {
 		return -1;
 	}
 
-	ret = uart_callback_set(uart, uart_cb, NULL);
+	ret = uart_callback_set(dbg_uart, dbg_uart_cb, NULL);
 	if (ret) {
+		return ret;
+	}
+
+	/////////////////////////////////// GPS UART SETUP ///////////////////////////////////
+	if (!device_is_ready(gps_uart)) {
+		dbg_print("gps_uart not ready.", sizeof("gps_uart not ready."));
+		return -1;
+	}
+
+	ret = uart_callback_set(gps_uart, gps_uart_cb, NULL);
+	if (ret) {
+		dbg_print("gps_uart_cb set failed.", sizeof("gps_uart_cb set failed."));
 		return ret;
 	}
 
 	k_msleep(1000);
-	ret = uart_rx_enable(uart, rx_buf, BUFF_SIZE, SYS_FOREVER_US);
+	ret = uart_rx_enable(gps_uart, rx_buf, BUFF_SIZE, SYS_FOREVER_US);
 	if (ret) {
-		printk("uart_rx_enable failed with ret=%d\n", ret);
+		dbg_print("gps_uart uart_rx_enable failed.", sizeof("gps_uart uart_rx_enable failed."));
 		return ret;
 	}
-	
-	static char tx_buf[] = "hello world!\n";
 
+	/////////////////////////////////// MAIN LOOP ///////////////////////////////////
 	int ctr = 0;
 	while (1) {
-
-		printk("x ");
 		ctr++;
 
-		// char c;
-		// int uart_poll_in_ret = 0;
-		// while (uart_poll_in_ret == 0) {
-		// 	uart_poll_in_ret = uart_poll_in(uart, &c);
-		// 	printk("%c", c);
-		// }
-		// printk("uart_poll_in err: %d\n", uart_poll_in_ret);
+		dbg_print("looping...", sizeof("looping..."));
 
-
-		ret = uart_tx(uart, tx_buf, sizeof(tx_buf), SYS_FOREVER_US);
-		if (ret) {
-			printk("uart_tx errored: %d.\n", ret);
-		}
-
-		k_msleep(SLEEP_TIME_MS);
-
+		k_msleep(250);
 	}
 
 	return 0;
