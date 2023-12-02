@@ -16,9 +16,8 @@
 const struct device *gps_uart = DEVICE_DT_GET(DT_NODELABEL(uart1));  // uart1: TX = P0.04, RX = P0.05.    TO BE USED FOR UART COMMS WITH GPS
 const struct device *dbg_uart = DEVICE_DT_GET(DT_NODELABEL(uart0));  // uart0: TX = P0.28, RX = P0.30.    TO BE USED FOR UART DEBUGGING
 
-// NOTE: if the transmitted data is more bytes than this buffer, this will cause a crash/reboot. (?)
-#define BUFF_SIZE 50  // Note: UART_RX_RDY event only occurs when RX buffer is full. (?)
-static char* rx_buf;
+#define BUFF_SIZE 50  // Note: UART_RX_RDY event only occurs when RX buffer is full.
+static char* rx_buf;  // Buffer that is used internally by UART callback
 
 
 static void dbg_print(char* buf, int len) {
